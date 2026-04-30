@@ -1,0 +1,1158 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FNV · Panel de Gestión</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg:#f5f8f8; --ink:#1a2832; --ink2:#3a5060; --ink3:#8aa0a8;
+  --card:#ffffff; --border:#d8e8e8; --accent:#c84040;
+  --accent3:#3aacac; --accent4:#5a8a6a; --accent5:#5a7aaa;
+  --fnv-teal:#3aacac; --fnv-dark:#1a2832;
+}
+body.dark {
+  --bg:#0e1518; --ink:#e0ecec; --ink2:#8ab0b8; --ink3:#4a6878;
+  --card:#151e24; --border:#1e3040; --accent:#e05050;
+  --accent3:#3aacac; --fnv-dark:#0e1518;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--ink);font-family:'IBM Plex Mono',monospace;min-height:100vh;transition:background 0.3s,color 0.3s;}
+
+#loadingOverlay{position:fixed;inset:0;background:rgba(14,21,24,0.95);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;gap:16px;}
+#loadingOverlay .spin{width:40px;height:40px;border:3px solid #3aacac44;border-top-color:#3aacac;border-radius:50%;animation:spin 0.8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+#loadingOverlay .msg{font-family:'IBM Plex Mono',monospace;font-size:0.75rem;color:#3aacac;letter-spacing:0.15em;text-transform:uppercase;}
+#loadingOverlay .sub{font-size:0.6rem;color:#8aa0a8;letter-spacing:0.1em;}
+
+header{background:var(--card);padding:0 48px;display:flex;align-items:stretch;border-bottom:3px solid var(--fnv-teal);transition:background 0.3s;}
+.header-brand{display:flex;flex-direction:column;justify-content:center;padding:10px 32px 10px 0;border-right:1px solid var(--border);}
+.header-brand .sub{font-size:0.55rem;letter-spacing:0.25em;color:var(--ink3);text-transform:uppercase;margin-top:4px;}
+
+.kpi-row{display:grid;grid-template-columns:repeat(6,1fr);gap:1px;background:var(--border);border:1px solid var(--border);margin-bottom:28px;}
+.kpi-box{background:var(--card);padding:20px 24px;transition:background 0.3s;}
+.kpi-box .lbl{font-size:0.55rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--ink3);margin-bottom:8px;}
+.kpi-box .val{font-family:'Bebas Neue',sans-serif;font-size:1.9rem;letter-spacing:0.05em;line-height:1;color:var(--ink);}
+.kpi-box .delta{font-size:0.6rem;color:var(--ink3);margin-top:4px;}
+.kpi-box .delta.up{color:var(--accent3);}
+.kpi-box .delta.down{color:var(--accent);}
+
+.content-grid{display:grid;grid-template-columns:2fr 1fr;gap:20px;margin-bottom:20px;}
+.bottom-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px;}
+.card{background:var(--card);border:1px solid var(--border);box-shadow:0 1px 4px rgba(0,0,0,0.06);padding:28px;transition:background 0.3s,border-color 0.3s;}
+.card-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;padding-bottom:16px;border-bottom:1px solid var(--border);}
+.card-title{font-family:'Bebas Neue',sans-serif;font-size:1.1rem;letter-spacing:0.08em;color:var(--ink);}
+.card-sub{font-size:0.6rem;color:var(--ink3);margin-top:3px;letter-spacing:0.05em;}
+canvas{width:100%!important;}
+
+.table-wrap{overflow-x:auto;}
+table{width:100%;border-collapse:collapse;font-size:0.7rem;}
+thead th{font-size:0.55rem;letter-spacing:0.15em;text-transform:uppercase;color:var(--ink3);padding:10px 12px;text-align:right;border-bottom:2px solid var(--fnv-teal);white-space:nowrap;}
+thead th:first-child{text-align:left;}
+tbody td{padding:9px 12px;text-align:right;border-bottom:1px solid var(--border);color:var(--ink);white-space:nowrap;}
+tbody td:first-child{text-align:left;font-weight:500;}
+tbody tr:hover td{background:rgba(58,172,172,0.05);}
+.tna-badge{display:inline-block;padding:2px 8px;border-radius:2px;font-weight:600;font-size:0.65rem;}
+.tna-low{background:rgba(58,172,172,0.15);color:#1a7070;}
+.tna-mid{background:rgba(212,134,10,0.15);color:#8a5500;}
+.tna-high{background:rgba(200,64,42,0.15);color:#9a1a0a;}
+
+.client-rail{display:flex;gap:8px;margin-bottom:28px;flex-wrap:wrap;}
+.client-btn{font-family:'IBM Plex Mono',monospace;font-size:0.7rem;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;padding:8px 20px;border:2px solid var(--border);background:var(--card);color:var(--ink2);cursor:pointer;transition:all 0.15s;border-radius:2px;}
+.client-btn:hover{border-color:var(--ink);color:var(--ink);}
+.client-btn.active{background:var(--ink);border-color:var(--ink);color:var(--bg);}
+.client-btn.c0.active{background:var(--fnv-teal);border-color:var(--fnv-teal);}
+.client-btn.c1.active{background:#2a6cc8;border-color:#2a6cc8;}
+.client-btn.c2.active{background:#2ab87a;border-color:#2ab87a;}
+.client-btn.c3.active{background:#d4860a;border-color:#d4860a;}
+.client-btn.c4.active{background:#7a2ac8;border-color:#7a2ac8;}
+.client-btn.c5.active{background:#c82a7a;border-color:#c82a7a;}
+
+.all-clients-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:20px;}
+.mini-card{background:var(--card);border:1px solid var(--border);padding:20px;cursor:pointer;transition:border-color 0.15s,transform 0.15s;border-top:3px solid transparent;}
+.mini-card:hover{transform:translateY(-2px);box-shadow:0 4px 16px rgba(58,172,172,0.15);border-color:var(--fnv-teal);}
+.mini-card.c0{border-top-color:#c8402a;}.mini-card.c1{border-top-color:#2a6cc8;}.mini-card.c2{border-top-color:#2ab87a;}
+.mini-card.c3{border-top-color:#d4860a;}.mini-card.c4{border-top-color:#7a2ac8;}.mini-card.c5{border-top-color:#c82a7a;}
+.mini-card .mc-name{font-family:'Bebas Neue',sans-serif;font-size:1.3rem;letter-spacing:0.08em;}
+.mini-card .mc-capital{font-size:1.1rem;font-weight:600;margin:6px 0 2px;}
+.mini-card .mc-info{font-size:0.6rem;color:var(--ink3);}
+.mini-card .mc-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:2px;}
+
+.broker-badge{display:inline-block;font-size:0.5rem;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;padding:2px 8px;border-radius:2px;vertical-align:middle;}
+.broker-dracma{background:rgba(200,64,42,0.10);color:#aa2828;border:1px solid rgba(200,64,42,0.25);}
+.broker-bcch{background:rgba(58,172,172,0.12);color:#2a8a8a;border:1px solid rgba(58,172,172,0.3);}
+
+.section-nav{background:var(--fnv-dark);display:flex;align-items:center;padding:0 48px;border-bottom:1px solid var(--border);transition:background 0.3s;}
+.snav-btn{font-family:'IBM Plex Mono',monospace;font-size:0.65rem;font-weight:600;letter-spacing:0.15em;text-transform:uppercase;color:#666;background:none;border:none;border-bottom:3px solid transparent;padding:14px 24px;cursor:pointer;transition:all 0.15s;}
+.snav-btn:hover{color:var(--bg);}
+.snav-btn.active{color:#fff;border-bottom-color:var(--accent);}
+
+.toggle-row{display:flex;gap:4px;}
+.toggle-btn{font-family:'IBM Plex Mono',monospace;font-size:0.6rem;letter-spacing:0.08em;text-transform:uppercase;padding:4px 12px;border:1px solid var(--border);background:none;cursor:pointer;color:var(--ink3);transition:all 0.15s;}
+.toggle-btn.active{background:var(--ink);color:var(--bg);border-color:var(--ink);}
+
+.app-section{min-height:60vh;}
+
+#darkBtn{font-family:'IBM Plex Mono',monospace;font-size:0.7rem;border:1px solid var(--border);background:var(--card);color:var(--ink);padding:5px 12px;cursor:pointer;border-radius:2px;transition:all 0.2s;white-space:nowrap;}
+
+.kpi-row-2{display:grid;grid-template-columns:repeat(2,1fr);gap:1px;background:var(--border);border:1px solid var(--border);margin-bottom:28px;max-width:500px;}
+
+/* Debug panel */
+#debugPanel{display:none;background:var(--card);border:1px solid var(--border);padding:16px;margin:16px 48px;font-size:0.65rem;color:var(--ink3);max-height:200px;overflow-y:auto;white-space:pre-wrap;}
+
+@media(max-width:1100px){
+  .content-grid,.bottom-grid{grid-template-columns:1fr;}
+  .kpi-row{grid-template-columns:repeat(3,1fr);}
+  .all-clients-grid{grid-template-columns:repeat(2,1fr);}
+  header,.section-nav{padding-left:20px;padding-right:20px;}
+}
+@media(max-width:700px){
+  .kpi-row{grid-template-columns:repeat(2,1fr);}
+  .all-clients-grid{grid-template-columns:1fr;}
+}
+</style>
+</head>
+<body>
+
+<div id="loadingOverlay">
+  <div class="spin"></div>
+  <div class="msg">Cargando datos</div>
+  <div class="sub">Conectando con Google Sheets...</div>
+</div>
+
+<header>
+  <div class="header-brand">
+    <div style="font-size:0.55rem;color:var(--ink3);letter-spacing:0.05em;padding:0 4px">
+      FNV Capital · Agente Productor de Agente de Negociación · Matrícula 750 - CNV
+    </div>
+  </div>
+  <div class="section-nav" style="background:transparent;border:none;flex:1">
+    <button class="snav-btn active" onclick="switchSection('caucion',this)" style="color:var(--ink2)">Cauciones</button>
+    <button class="snav-btn" onclick="switchSection('prestamo',this)" style="color:var(--ink2)">Préstamo de Títulos</button>
+    <button class="snav-btn" onclick="switchSection('facturacion',this)" style="color:var(--ink2)">Facturación</button>
+    <button class="snav-btn" onclick="switchSection('tasas',this)" style="color:var(--ink2)">Tasas</button>
+  </div>
+  <div style="display:flex;align-items:center;gap:6px;margin-left:auto;padding:0 8px">
+    <button id="darkBtn" onclick="toggleDark()">🌙 Dark</button>
+    <button onclick="recargarDatos()" style="font-family:'IBM Plex Mono';font-size:0.55rem;letter-spacing:0.1em;text-transform:uppercase;border:1px solid var(--fnv-teal);background:rgba(58,172,172,0.12);color:var(--fnv-teal);padding:5px 12px;cursor:pointer;white-space:nowrap">↺ Actualizar</button>
+    <button onclick="exportarDatos()" style="font-family:'IBM Plex Mono';font-size:0.55rem;letter-spacing:0.1em;text-transform:uppercase;border:1px solid var(--border);background:var(--card);color:var(--ink3);padding:5px 12px;cursor:pointer;white-space:nowrap">⬇ Exportar</button>
+  </div>
+</header>
+
+<nav class="section-nav">
+  <button class="snav-btn active" onclick="switchSection('caucion',this)">Cauciones</button>
+  <button class="snav-btn" onclick="switchSection('prestamo',this)">Préstamo de Títulos</button>
+  <button class="snav-btn" onclick="switchSection('facturacion',this)">Facturación</button>
+  <button class="snav-btn" onclick="switchSection('tasas',this)">Tasas</button>
+</nav>
+
+<!-- ══════ CAUCIONES ══════ -->
+<div id="sectionCauciones" class="app-section">
+<div style="padding:32px 48px;max-width:1500px;margin:0 auto">
+  <div class="client-rail" id="clientRail">
+    <button class="client-btn active" onclick="showAll()">Todos</button>
+  </div>
+  <div id="allView"><div class="all-clients-grid" id="allGrid"></div></div>
+  <div id="singleView" style="display:none">
+    <div class="kpi-row" id="kpiRow"></div>
+    <div class="content-grid">
+      <div class="card">
+        <div class="card-header">
+          <div><div class="card-title">Evolución del capital</div><div class="card-sub">Caución tomadora neta en pesos</div></div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <button onclick="downloadWordCaucion(currentClient,'pdf')" style="font-family:'IBM Plex Mono';font-size:0.6rem;letter-spacing:0.08em;text-transform:uppercase;border:none;background:var(--ink);color:var(--bg);padding:5px 14px;cursor:pointer;font-weight:600">🖨 Imprimir</button>
+            <button onclick="downloadWordCaucion(currentClient,'word')" style="font-family:'IBM Plex Mono';font-size:0.6rem;letter-spacing:0.08em;text-transform:uppercase;border:1px solid var(--fnv-teal);background:rgba(58,172,172,0.1);color:var(--fnv-teal);padding:5px 12px;cursor:pointer">⬇ Word</button>
+            <div class="toggle-row">
+              <button class="toggle-btn active" onclick="setChartMode('caucion',this)">Capital</button>
+              <button class="toggle-btn" onclick="setChartMode('tna',this)">TNA %</button>
+            </div>
+          </div>
+        </div>
+        <canvas id="chartMain" height="200"></canvas>
+      </div>
+      <div class="card">
+        <div class="card-header"><div><div class="card-title">Distribución de tasas</div><div class="card-sub">Frecuencia de TNA por rango</div></div></div>
+        <canvas id="chartTna" height="200"></canvas>
+      </div>
+    </div>
+    <div class="bottom-grid">
+      <div class="card">
+        <div class="card-header"><div><div class="card-title">Costos operativos</div><div class="card-sub">Aranceles + gastos por operación</div></div></div>
+        <canvas id="chartCostos" height="180"></canvas>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <div><div class="card-title">Detalle de operaciones</div><div class="card-sub" id="tableSubtitle"></div></div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Fecha</th><th>Capital</th><th>TNA</th><th>Días</th><th>Interés</th><th>Gastos</th><th>Neto</th></tr></thead>
+            <tbody id="tableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ══════ PRÉSTAMOS ══════ -->
+<div id="sectionPrestamos" class="app-section" style="display:none">
+<div style="padding:32px 48px 48px;max-width:1500px;margin:0 auto">
+  <div class="kpi-row" id="ptKpiRow" style="margin-bottom:28px"></div>
+  <div class="card" style="margin-bottom:20px">
+    <div class="card-header">
+      <div><div class="card-title">Vencimientos</div><div class="card-sub">Ordenado por fecha de vencimiento</div></div>
+      <div style="font-size:0.65rem;color:var(--ink3)">Hoy: <span id="ptHoy"></span></div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Fecha venc.</th><th>Días p/venc.</th><th>Prestamista</th><th>Prestatario</th><th>ALyC</th><th>Estado</th></tr></thead>
+        <tbody id="ptVencTable"></tbody>
+      </table>
+    </div>
+  </div>
+  <div class="client-rail" id="ptClientRail">
+    <button class="client-btn active" onclick="ptShowAll(this)">Todos</button>
+  </div>
+  <div id="ptAllView"><div class="all-clients-grid" id="ptAllGrid"></div></div>
+  <div id="ptClientView" style="display:none">
+    <div style="display:flex;gap:8px;margin-bottom:16px">
+      <button onclick="downloadWordPrestamo(ptCurrentCliente,'pdf')" style="font-family:'IBM Plex Mono';font-size:0.6rem;letter-spacing:0.08em;text-transform:uppercase;border:none;background:var(--ink);color:var(--bg);padding:6px 14px;cursor:pointer;font-weight:600">🖨 Imprimir</button>
+      <button onclick="downloadWordPrestamo(ptCurrentCliente,'word')" style="font-family:'IBM Plex Mono';font-size:0.6rem;letter-spacing:0.08em;text-transform:uppercase;border:1px solid var(--fnv-teal);background:rgba(58,172,172,0.1);color:var(--fnv-teal);padding:6px 14px;cursor:pointer">⬇ Word</button>
+    </div>
+    <div class="kpi-row" id="ptClientKpis" style="margin-bottom:20px"></div>
+    <div class="content-grid" style="margin-bottom:20px">
+      <div class="card">
+        <div class="card-header"><div class="card-title">Activos en garantía</div></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th style="text-align:left">Ticket</th><th>Cantidad</th><th>VN Inicio ($)</th></tr></thead>
+            <tbody id="ptGarantiaTable"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><div class="card-title">Datos del contrato</div></div>
+        <div id="ptContratoDetail" style="font-size:0.75rem;line-height:2.2"></div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ══════ FACTURACIÓN ══════ -->
+<div id="sectionFacturacion" class="app-section" style="display:none">
+<div style="padding:32px 48px 40px;max-width:1500px;margin:0 auto">
+  <div class="kpi-row" id="fKpiRow" style="margin-bottom:28px"></div>
+  <div class="content-grid" style="margin-bottom:20px">
+    <div class="card">
+      <div class="card-header"><div><div class="card-title">Facturación mensual</div><div class="card-sub">Total facturado por mes en pesos</div></div></div>
+      <canvas id="chartFactMes" height="200"></canvas>
+    </div>
+    <div class="card">
+      <div class="card-header"><div><div class="card-title">Por cliente</div><div class="card-sub">Distribución del total facturado</div></div></div>
+      <canvas id="chartFactCliente" height="200"></canvas>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-header">
+      <div><div class="card-title">Detalle de facturas</div><div class="card-sub" id="fTableSub"></div></div>
+      <div class="toggle-row">
+        <button class="toggle-btn active" onclick="filterFacturas('todas',this)">Todas</button>
+        <button class="toggle-btn" onclick="filterFacturas('Pendiente',this)">Pendientes</button>
+        <button class="toggle-btn" onclick="filterFacturas('Facturada',this)">Facturadas</button>
+        <button class="toggle-btn" onclick="filterFacturas('Pagada',this)">Pagadas</button>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th style="text-align:left">Cliente</th><th>Mes</th><th>Fecha Fac.</th><th>Fecha Pago</th><th>Monto</th><th>IVA</th><th>Total</th><th>Estado</th></tr></thead>
+        <tbody id="fTableBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ══════ TASAS ══════ -->
+<div id="sectionTasas" class="app-section" style="display:none">
+<div style="padding:32px 48px 48px;max-width:1500px;margin:0 auto">
+  <div class="kpi-row-2" id="tasasKpi"></div>
+  <div class="card" style="margin-bottom:20px">
+    <div class="card-header">
+      <div><div class="card-title">Tasa de Caución a 1 día</div><div class="card-sub">Promedio diario · TNA %</div></div>
+    </div>
+    <canvas id="chartTasas1d" height="140"></canvas>
+  </div>
+  <div class="card">
+    <div class="card-header">
+      <div><div class="card-title">Tasa de Caución a 7 días</div><div class="card-sub">Promedio diario · TNA %</div></div>
+    </div>
+    <canvas id="chartTasas7d" height="140"></canvas>
+  </div>
+</div>
+</div>
+
+<script>
+const API_URL = 'https://script.google.com/macros/s/AKfycbxrJHZF-B7wDWImbRvZ8GXmdWIgZXOZo1YNDm2plkcJPsdGQFUczgCMx0_qE0CRbCdh2A/exec';
+
+
+// ── DARK MODE ──
+function toggleDark() {
+  const isDark = document.body.classList.toggle('dark');
+  document.getElementById('darkBtn').textContent = isDark ? '☀ Claro' : '🌙 Dark';
+  localStorage.setItem('fnv-theme', isDark ? 'dark' : 'light');
+  if(currentClient) renderCharts(currentClient);
+  if(tasasInited) renderTasasCharts();
+}
+if(localStorage.getItem('fnv-theme')==='dark') {
+  document.body.classList.add('dark');
+  document.addEventListener('DOMContentLoaded',()=>{ document.getElementById('darkBtn').textContent='☀ Claro'; });
+}
+
+// ── HELPERS ──
+const fM = v => {
+  if(v>=1e9) return '$'+(v/1e9).toFixed(2)+'MM';
+  if(v>=1e6) return '$'+(v/1e6).toFixed(2)+'M';
+  if(v>=1e3) return '$'+(v/1e3).toFixed(0)+'K';
+  return '$'+v.toFixed(0);
+};
+const fN = (v,dec=0) => Number(v).toLocaleString('es-AR',{minimumFractionDigits:dec,maximumFractionDigits:dec});
+
+function fFecha(val) {
+  if(!val||val==='—') return '—';
+  const s=String(val);
+  // ISO con zona horaria: "2026-04-29T03:00:00.000Z" → tomar solo la parte de fecha UTC
+  const isoFull=s.match(/^(\d{4})-(\d{2})-(\d{2})T/);
+  if(isoFull) return `${isoFull[3]}/${isoFull[2]}/${isoFull[1]}`;
+  const iso=s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if(iso) return `${iso[3]}/${iso[2]}/${iso[1]}`;
+  if(s.match(/^\d{2}\/\d{2}\/\d{4}/)) return s;
+  return s;
+}
+
+function pN(v) {
+  if(v===null||v===undefined||v==='') return 0;
+  const s=String(v).trim().replace(/[$\s]/g,'');
+  const n=s.includes(',')
+    ? parseFloat(s.replace(/\./g,'').replace(',','.'))
+    : parseFloat(s.replace(/,/g,''));
+  return isNaN(n)?0:n;
+}
+
+// ── FORMATEO DE PORCENTAJES ──
+// Para cauciones: detecta si viene como 21.10 (>1) o 0.211 (<1)
+function formatearPorcentaje(v) {
+  const n = Number(v);
+  if (n > 1) {
+    // ya está como 21.10 → "21,10%"
+    return n.toFixed(2).replace('.', ',') + '%';
+  } else {
+    // está como 0.211 → "21,10%"
+    return new Intl.NumberFormat('es-AR', {
+      style: 'percent',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(n);
+  }
+}
+
+// Para tasas de mercado (hoja Tasas): valores como 0.211 → "21,10%"
+function mostrarPorcentaje(v) {
+  const n = pN(v);
+  return (n * 100).toFixed(2).replace('.', ',') + '%';
+}
+
+// Para parsear tasa en cauciones (preserva valor numérico para cálculos)
+function pTasaCaucion(v) {
+  const n = pN(v);
+  // Si viene como 0.211, convertir a 21.1 para mantener consistencia interna
+  return n <= 1 && n > 0 ? n * 100 : n;
+}
+
+// Para parsear tasa en hoja Tasas (preserva como decimal para mostrarPorcentaje)
+// El valor se guarda tal cual viene (0.211), mostrarPorcentaje lo multiplica x100
+function pTasaMercado(v) {
+  return pN(v);
+  // No transformar: mostrarPorcentaje lo maneja
+}
+
+function parseFechaToDate(str) {
+  if(!str||str==='—') return null;
+  const p=str.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if(p) return new Date(parseInt(p[3]),parseInt(p[2])-1,parseInt(p[1]));
+  const iso=str.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if(iso) return new Date(parseInt(iso[1]),parseInt(iso[2])-1,parseInt(iso[3]));
+  return null;
+}
+
+function diasHasta(fechaStr) {
+  const hoy=new Date(); hoy.setHours(0,0,0,0);
+  const d=parseFechaToDate(fechaStr);
+  if(!d) return 999;
+  return Math.ceil((d-hoy)/86400000);
+}
+
+// ── DATA ──
+let RAW={}, PRESTAMOS=[], FACTURAS=[], CLIENT_BROKER={}, PT_CUPO={}, CLIENTS=[];
+let TASAS_1D=[], TASAS_7D=[];
+let DEBUG_TASAS_RAW = null; // para diagnosticar
+const COLORS=['#c8402a','#2a6cc8','#2ab87a','#d4860a','#7a2ac8','#c82a7a'];
+
+function getChartColors() {
+  const dark=document.body.classList.contains('dark');
+  return {
+    grid: dark?'#1e3040':'#e8e4db',
+    tick: dark?'#4a6878':'#aaa',
+    tooltip_bg: dark?'#0e1518':'#1a1a1a',
+    tooltip_body: dark?'#e0ecec':'#f5f2ec'
+  };
+}
+
+function showLoading(msg){ const ov=document.getElementById('loadingOverlay'); ov.querySelector('.msg').textContent=msg||'Cargando datos'; ov.style.display='flex'; }
+function hideLoading(){ document.getElementById('loadingOverlay').style.display='none'; }
+async function recargarDatos(){ showLoading('Actualizando...'); await cargarDatos(); }
+
+async function cargarDatos() {
+  try {
+    const res=await fetch(API_URL);
+    const data=await res.json();
+    if(data.error) throw new Error(data.error);
+
+    // ── CAUCIONES ──
+    RAW={};
+    const rawArr=data.cauciones;
+    if(Array.isArray(rawArr)) {
+      rawArr.forEach(r=>{
+        const c=(r.cliente||'').trim(); if(!c) return;
+        if(!RAW[c]) RAW[c]=[];
+        RAW[c].push({
+          fecha:        fFecha(r.fecha),
+          caucion:      pN(r.caucion),
+          tna:          pTasaCaucion(r.tna),
+          plazo:        parseInt(r.plazo)||1,
+          interes:      pN(r.interes),
+          bruto:        pN(r.bruto),
+          arancel:      pN(r.arancel),
+          total_gastos: pN(r.total_gastos),
+          neto:         pN(r.neto),
+          tea:          pTasaCaucion(r.tea),
+          cft:          pTasaCaucion(r.cft)
+        });
+      });
+    } else {
+      Object.keys(rawArr||{}).forEach(c=>{
+        RAW[c]=(rawArr[c]||[]).map(r=>({
+          fecha:        fFecha(r.fecha),
+          caucion:      pN(r.caucion),
+          tna:          pTasaCaucion(r.tna),
+          plazo:        parseInt(r.plazo)||1,
+          interes:      pN(r.interes),
+          bruto:        pN(r.bruto),
+          arancel:      pN(r.arancel),
+          total_gastos: pN(r.total_gastos),
+          neto:         pN(r.neto),
+          tea:          pTasaCaucion(r.tea),
+          cft:          pTasaCaucion(r.cft)
+        }));
+      });
+    }
+
+    // ── PRÉSTAMOS ──
+    PRESTAMOS=[];
+    const garantiasRaw=data.garantias||[];
+    (data.prestamos||[]).forEach((p,i)=>{
+      const clienteNorm=(p.cliente||'').trim();
+      PRESTAMOS.push({
+        id: i+1,
+        cliente:     clienteNorm,
+        prestamista: (p.prestamista||'').trim(),
+        alyc:        p.alyc||'',
+        comitente:   p.comitente||'',
+        fecha_firma: fFecha(p.fecha_firma||p.fecha_transf),
+        plazo:       parseInt(p.plazo)||0,
+        fecha_venc:  fFecha(p.fecha_venc),
+        estado:      p.estado||'Vigente',
+        garantias: garantiasRaw
+          .filter(g=>{
+            const mismoCliente = (g.cliente||'').trim()===clienteNorm;
+            const prestamistaNorm = (p.prestamista||'').trim();
+            const gPrestamista = (g.prestamista||'').trim();
+            // Si la garantía tiene prestamista, matchear por cliente+prestamista
+            // Si no tiene prestamista cargado, matchear solo por cliente
+            return mismoCliente && (gPrestamista===''|| gPrestamista===prestamistaNorm);
+          })
+          .map(g=>({
+            ticket:    (g.ticket||'').trim(),
+            cantidad:  pN(g.cantidad),
+            vn_inicio: pN(g.vn_inicio)
+          }))
+      });
+    });
+
+    // ── FACTURAS ──
+    FACTURAS=(data.facturas||[]).map(f=>({
+      cliente:    (f.cliente||'').trim(),
+      cuit:       f.cuit||'',
+      monto:      pN(f.monto),
+      iva:        pN(f.iva),
+      total:      pN(f.total),
+      mes:        f.mes||'',
+      fecha_fac:  fFecha(f.fecha_fac||f['fecha _fac']),
+      fecha_pago: fFecha(f.fecha_pago),
+      concepto:   f.concepto||'',
+      estado:     f.estado||'Pendiente'
+    }));
+
+    // ── CONFIG ──
+    CLIENT_BROKER=(data.config&&data.config.brokers)||{};
+    PT_CUPO=(data.config&&data.config.cupos)||{};
+
+    // ── TASAS: parseo robusto con múltiples nombres de columna posibles ──
+    TASAS_1D=[];
+    TASAS_7D=[];
+    const tasasArr = data.tasas || [];
+    DEBUG_TASAS_RAW = tasasArr; // guardar para debug
+
+    tasasArr.forEach(r => {
+      const f1d = r['fecha_1d'], v1d = r['promedio_1d'];
+      if(f1d && v1d !== undefined && v1d !== '') {
+        const num = pN(v1d);
+        if(!isNaN(num) && num !== 0)
+          TASAS_1D.push({ fecha: fFecha(f1d), valor: num });
+      }
+      const f7d = r['fecha_7d'], v7d = r['promedio_7d'];
+      if(f7d && v7d !== undefined && v7d !== '') {
+        const num = pN(v7d);
+        if(!isNaN(num) && num !== 0)
+          TASAS_7D.push({ fecha: fFecha(f7d), valor: num });
+      }
+    });
+
+    // Ordenar de más viejo a más nuevo para los gráficos
+    const sortFecha = (a, b) => {
+      const da = parseFechaToDate(a.fecha) || new Date(a.fecha);
+      const db = parseFechaToDate(b.fecha) || new Date(b.fecha);
+      return da - db;
+    };
+    TASAS_1D.sort(sortFecha);
+    TASAS_7D.sort(sortFecha);
+
+    CLIENTS=Object.keys(RAW).filter(k=>RAW[k]&&RAW[k].length>0);
+    CLIENTS.forEach(c=>{ if(!CLIENT_BROKER[c]) CLIENT_BROKER[c]='Dracma'; });
+
+    rebuildClientUI();
+    buildAllGrid();
+    hideLoading();
+
+  } catch(err) {
+    hideLoading();
+    console.error(err);
+    const b=document.createElement('div');
+    b.style.cssText='position:fixed;top:0;left:0;right:0;background:#c84040;color:#fff;padding:10px 20px;font-size:0.7rem;z-index:9998;display:flex;justify-content:space-between;align-items:center';
+    b.innerHTML=`⚠ Error al cargar datos: ${err.message} <button onclick="this.parentElement.remove()" style="background:none;border:1px solid #fff;color:#fff;padding:2px 8px;cursor:pointer">✕</button>`;
+    document.body.appendChild(b);
+  }
+}
+
+// ── UI ──
+function rebuildClientUI() {
+  const rail=document.getElementById('clientRail');
+  const todosBtn=rail.querySelector('.client-btn');
+  rail.innerHTML=''; rail.appendChild(todosBtn);
+  CLIENTS.forEach((c,i)=>{
+    const broker=CLIENT_BROKER[c]||'Dracma';
+    const btn=document.createElement('button');
+    btn.className=`client-btn c${i%6}`;
+    btn.innerHTML=`${c} <span class="broker-badge broker-${broker.toLowerCase()}">${broker}</span>`;
+    btn.onclick=()=>showClient(c,btn);
+    rail.appendChild(btn);
+  });
+}
+
+function buildAllGrid() {
+  const grid=document.getElementById('allGrid'); if(!grid) return;
+  grid.innerHTML='';
+  CLIENTS.forEach((c,i)=>{
+    const d=RAW[c]||[], broker=CLIENT_BROKER[c]||'Dracma';
+    const last=d.length?d[d.length-1]:null;
+    const totalInt=d.reduce((s,r)=>s+r.interes,0);
+    const avgTna=d.length?d.reduce((s,r)=>s+r.tna,0)/d.length:0;
+    const div=document.createElement('div');
+    div.className=`mini-card c${i%6}`;
+    div.innerHTML=`
+      <div class="mc-header"><div class="mc-name">${c}</div><span class="broker-badge broker-${broker.toLowerCase()}">${broker}</span></div>
+      <div class="mc-capital">${last?fM(last.neto):'—'}</div>
+      <div class="mc-info">${d.length} operaciones · TNA prom ${avgTna.toFixed(1)}% · Int. acum. ${fM(totalInt)}</div>`;
+    div.onclick=()=>{ const btn=[...document.querySelectorAll('#clientRail .client-btn')][i+1]; showClient(c,btn); };
+    grid.appendChild(div);
+  });
+}
+
+// ── CAUCIONES ──
+let currentClient=null, chartMain=null, chartTna=null, chartCostos=null, chartMode='caucion', tableShowAll=false;
+
+function showAll() {
+  currentClient=null;
+  document.querySelectorAll('#clientRail .client-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelector('#clientRail .client-btn').classList.add('active');
+  document.getElementById('allView').style.display='';
+  document.getElementById('singleView').style.display='none';
+}
+
+function showClient(name,btn) {
+  currentClient=name;
+  document.querySelectorAll('#clientRail .client-btn').forEach(b=>b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  document.getElementById('allView').style.display='none';
+  document.getElementById('singleView').style.display='';
+  renderKPIs(name); renderCharts(name); renderTable(name);
+}
+
+function renderKPIs(name) {
+  const d=RAW[name]||[], broker=CLIENT_BROKER[name]||'Dracma';
+  if(!d.length){ document.getElementById('kpiRow').innerHTML=`<div class="kpi-box" style="grid-column:1/-1"><div class="lbl">Sin operaciones</div></div>`; return; }
+  const last=d[d.length-1], first=d[0];
+  const totalInt=d.reduce((s,r)=>s+r.interes,0);
+  const totalGastos=d.reduce((s,r)=>s+r.total_gastos,0);
+  const avgTna=d.reduce((s,r)=>s+r.tna,0)/d.length;
+  const avgCft=d.reduce((s,r)=>s+(r.cft||0),0)/d.length;
+  const rend=first.caucion>0?((last.neto/first.caucion-1)*100).toFixed(2):0;
+  document.getElementById('kpiRow').innerHTML=`
+    <div class="kpi-box"><div class="lbl">Capital actual</div><div class="val">${fM(last.neto)}</div><div class="delta">Último: ${last.fecha}</div></div>
+    <div class="kpi-box"><div class="lbl">Capital inicial</div><div class="val">${fM(first.caucion)}</div><div class="delta">Desde: ${first.fecha}</div></div>
+    <div class="kpi-box"><div class="lbl">Interés acumulado</div><div class="val">${fM(totalInt)}</div><div class="delta up">+${rend}% total</div></div>
+    <div class="kpi-box"><div class="lbl">TNA promedio</div><div class="val">${formatearPorcentaje(avgTna)}</div><div class="delta">${d.length} operaciones</div></div>
+    <div class="kpi-box"><div class="lbl">Gastos totales</div><div class="val">${fM(totalGastos)}</div><div class="delta">${totalInt>0?((totalGastos/totalInt)*100).toFixed(1):0}% del interés</div></div>
+    <div class="kpi-box"><div class="lbl">CFT promedio</div><div class="val">${formatearPorcentaje(avgCft)}</div><div class="delta">Costo Financiero Total</div></div>`;
+}
+
+function setChartMode(mode,btn) {
+  chartMode=mode;
+  document.querySelectorAll('#singleView .toggle-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  if(currentClient) renderChartMain(currentClient);
+}
+
+function renderCharts(name){ renderChartMain(name); renderChartTna(name); renderChartCostos(name); }
+function getColor(name){ return COLORS[CLIENTS.indexOf(name)%COLORS.length]||'#3aacac'; }
+
+function chartOpts(extra={}) {
+  const c=getChartColors();
+  return {
+    responsive:true, maintainAspectRatio:true,
+    plugins:{ legend:{display:false}, tooltip:{ backgroundColor:c.tooltip_bg, borderColor:'#333', borderWidth:1, titleColor:'#888', bodyColor:c.tooltip_body } },
+    scales:{
+      x:{ grid:{color:c.grid}, ticks:{color:c.tick,font:{family:'IBM Plex Mono',size:9},maxTicksLimit:8} },
+      y:{ grid:{color:c.grid}, ticks:{color:c.tick,font:{family:'IBM Plex Mono',size:9}}, border:{dash:[4,4]} }
+    },
+    ...extra
+  };
+}
+
+function renderChartMain(name) {
+  const d=RAW[name]||[]; if(!d.length) return;
+  const color=getColor(name); const c=getChartColors();
+  if(chartMain) chartMain.destroy();
+  if(chartMode==='caucion') {
+    chartMain=new Chart(document.getElementById('chartMain'),{
+      type:'line',
+      data:{labels:d.map(r=>r.fecha),datasets:[{label:'Capital neto (M$)',data:d.map(r=>r.neto/1e6),borderColor:color,backgroundColor:color+'18',borderWidth:2,pointRadius:d.length>30?2:4,pointBackgroundColor:color,fill:true,tension:0.3}]},
+      options:{...chartOpts(),plugins:{legend:{display:false},tooltip:{backgroundColor:c.tooltip_bg,borderColor:'#333',borderWidth:1,titleColor:'#888',bodyColor:c.tooltip_body,callbacks:{label:ctx=>`  $${fN(ctx.raw,2)}M`}}}}
+    });
+  } else {
+    chartMain=new Chart(document.getElementById('chartMain'),{
+      type:'line',
+      data:{labels:d.map(r=>r.fecha),datasets:[
+        {label:'TNA (%)',data:d.map(r=>r.tna),borderColor:color,backgroundColor:'transparent',borderWidth:2,pointRadius:2,fill:false,tension:0.3,yAxisID:'yTna'},
+        {label:'Capital (M$)',data:d.map(r=>r.neto/1e6),borderColor:color+'55',backgroundColor:color+'10',borderWidth:1,pointRadius:0,fill:true,tension:0.3,yAxisID:'yCap',borderDash:[4,4]}
+      ]},
+      options:{responsive:true,maintainAspectRatio:true,plugins:{legend:{labels:{color:c.tick,font:{family:'IBM Plex Mono',size:9},boxWidth:12}},tooltip:{backgroundColor:c.tooltip_bg,borderColor:'#333',borderWidth:1,titleColor:'#888',bodyColor:c.tooltip_body}},scales:{x:{grid:{color:c.grid},ticks:{color:c.tick,font:{family:'IBM Plex Mono',size:9},maxTicksLimit:8}},yTna:{position:'left',grid:{color:c.grid},ticks:{color:c.tick,font:{family:'IBM Plex Mono',size:9},callback:v=>v+'%'},border:{dash:[4,4]}},yCap:{position:'right',grid:{display:false},ticks:{color:c.tick,font:{family:'IBM Plex Mono',size:9},callback:v=>'$'+v+'M'}}}}
+    });
+  }
+}
+
+function renderChartTna(name) {
+  const d=RAW[name]||[], color=getColor(name), c=getChartColors();
+  const ranges=[[0,20],[20,30],[30,40],[40,50],[50,200]];
+  const labels=['< 20%','20–30%','30–40%','40–50%','> 50%'];
+  const counts=ranges.map(([a,b])=>d.filter(r=>r.tna>=a&&r.tna<b).length);
+  if(chartTna) chartTna.destroy();
+  chartTna=new Chart(document.getElementById('chartTna'),{
+    type:'bar',
+    data:{labels,datasets:[{data:counts,backgroundColor:color+'cc',borderRadius:2,borderSkipped:false}]},
+    options:{responsive:true,maintainAspectRatio:true,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{color:c.tick,font:{family:'IBM Plex Mono',size:9}}},y:{grid:{color:c.grid},ticks:{color:c.tick,font:{family:'IBM Plex Mono',size:9},stepSize:1},border:{dash:[4,4]}}}}
+  });
+}
+
+function renderChartCostos(name) {
+  const d=RAW[name]||[], color=getColor(name), c=getChartColors();
+  if(chartCostos) chartCostos.destroy();
+  chartCostos=new Chart(document.getElementById('chartCostos'),{
+    type:'bar',
+    data:{labels:d.map(r=>r.fecha),datasets:[
+      {label:'Arancel',data:d.map(r=>r.arancel),backgroundColor:'rgba(26,40,50,0.2)',borderRadius:0},
+      {label:'Otros gastos',data:d.map(r=>r.total_gastos-r.arancel),backgroundColor:color+'88',borderRadius:0}
+    ]},
+    options:{responsive:true,maintainAspectRatio:true,plugins:{legend:{labels:{color:c.tick,font:{family:'IBM Plex Mono',size:9}}}},scales:{x:{stacked:true,grid:{display:false},ticks:{color:c.tick,font:{family:'IBM Plex Mono',size:9},maxTicksLimit:6}},y:{stacked:true,grid:{color:c.grid},ticks:{color:c.tick,font:{family:'IBM Plex Mono',size:9}},border:{dash:[4,4]}}}}
+  });
+}
+
+function renderTable(name) {
+  const d=RAW[name]||[];
+  const shown=tableShowAll?d.length:20;
+  const rows=[...d].reverse().slice(0,shown);
+  document.getElementById('tableSubtitle').innerHTML=`${d.length} registros`+(d.length>20?` &nbsp;<button onclick="toggleShowAll('${name}')" style="font-family:'IBM Plex Mono';font-size:0.6rem;border:1px solid var(--border);background:none;padding:2px 8px;cursor:pointer;color:var(--ink3)">${tableShowAll?'Ver menos':'Ver todos'}</button>`:'');
+  document.getElementById('tableBody').innerHTML=rows.map(r=>{
+    const cls=r.tna<25?'tna-low':r.tna<40?'tna-mid':'tna-high';
+    return `<tr>
+      <td>${r.fecha}</td><td>$${fN(r.caucion/1e6,2)}M</td>
+      <td><span class="tna-badge ${cls}">${formatearPorcentaje(r.tna)}</span></td>
+      <td>${r.plazo}d</td>
+      <td style="color:#2a7a50">+$${fN(r.interes)}</td>
+      <td style="color:var(--accent)">-$${fN(r.total_gastos)}</td>
+      <td style="font-weight:600">$${fN(r.neto/1e6,2)}M</td>
+    </tr>`;
+  }).join('');
+}
+function toggleShowAll(name){ tableShowAll=!tableShowAll; renderTable(name); }
+
+// ── PRÉSTAMOS ──
+let ptCurrentCliente=null;
+function ptRenderAll(){ ptRenderKPIs(); ptRenderVencimientos(); ptRenderClientRail(); ptRenderAllGrid(); }
+
+function ptRenderKPIs() {
+  const vigentes=PRESTAMOS.filter(p=>p.estado==='Vigente');
+  const proximos=vigentes.filter(p=>{ const d=diasHasta(p.fecha_venc); return d>=0&&d<=30; });
+  const totalVN=PRESTAMOS.reduce((s,p)=>s+p.garantias.reduce((gs,g)=>gs+(g.vn_inicio||0),0),0);
+  document.getElementById('ptKpiRow').innerHTML=`
+    <div class="kpi-box"><div class="lbl">Préstamos vigentes</div><div class="val">${vigentes.length}</div><div class="delta">${PRESTAMOS.length} en total</div></div>
+    <div class="kpi-box"><div class="lbl">Vencen en 30 días</div><div class="val" style="color:var(--accent4)">${proximos.length}</div><div class="delta">${proximos.map(p=>p.cliente).join(', ')||'—'}</div></div>
+    <div class="kpi-box"><div class="lbl">VN total en garantía</div><div class="val">${fM(totalVN)}</div></div>
+    <div class="kpi-box"><div class="lbl">Clientes activos</div><div class="val">${new Set(PRESTAMOS.map(p=>p.cliente)).size}</div></div>
+    <div class="kpi-box"><div class="lbl">Vencidos</div><div class="val">${PRESTAMOS.filter(p=>p.estado==='Vencido').length}</div></div>`;
+}
+
+function ptRenderVencimientos() {
+  document.getElementById('ptHoy').textContent=new Date().toLocaleDateString('es-AR');
+  const sorted=[...PRESTAMOS].sort((a,b)=>(parseFechaToDate(a.fecha_venc)||new Date(9999,0))-(parseFechaToDate(b.fecha_venc)||new Date(9999,0)));
+  document.getElementById('ptVencTable').innerHTML=sorted.map(p=>{
+    const dias=diasHasta(p.fecha_venc);
+    const dc=dias<0?'color:var(--accent)':dias<=30?'color:var(--accent4);font-weight:600':'color:var(--fnv-teal)';
+    const eb=p.estado==='Vigente'?'background:rgba(42,184,122,0.15);color:#1a8055;border:1px solid rgba(42,184,122,0.3)':'background:rgba(200,64,42,0.15);color:#9a1a0a;border:1px solid rgba(200,64,42,0.3)';
+    return `<tr style="cursor:pointer" onclick="ptSelectCliente('${p.cliente}')">
+      <td>${p.fecha_venc}</td>
+      <td style="text-align:right;${dc}">${dias>=0?dias:'Vencido'}</td>
+      <td>${p.prestamista}</td>
+      <td style="font-family:'Bebas Neue',sans-serif;font-size:0.85rem">${p.cliente}</td>
+      <td><span class="broker-badge broker-${(p.alyc||'').toLowerCase()}">${p.alyc}</span></td>
+      <td><span style="${eb};font-size:0.55rem;padding:3px 8px;display:inline-block">${p.estado}</span></td>
+    </tr>`;
+  }).join('');
+}
+
+function ptRenderClientRail() {
+  const rail=document.getElementById('ptClientRail');
+  const clientes=[...new Set(PRESTAMOS.map(p=>p.cliente))];
+  const todosBtn=rail.querySelector('.client-btn');
+  rail.innerHTML=''; rail.appendChild(todosBtn);
+  clientes.forEach((c,i)=>{
+    const btn=document.createElement('button');
+    btn.className=`client-btn c${i%6}`; btn.textContent=c;
+    btn.onclick=()=>ptSelectCliente(c,btn);
+    rail.appendChild(btn);
+  });
+}
+
+function ptRenderAllGrid() {
+  const grid=document.getElementById('ptAllGrid'); const clientMap={};
+  PRESTAMOS.forEach(p=>{ if(!clientMap[p.cliente]) clientMap[p.cliente]=[]; clientMap[p.cliente].push(p); });
+  grid.innerHTML=Object.entries(clientMap).map(([c,ps],i)=>{
+    const totalVN=ps.reduce((s,p)=>s+p.garantias.reduce((gs,g)=>gs+(g.vn_inicio||0),0),0);
+    const proxVenc=[...ps].sort((a,b)=>(parseFechaToDate(a.fecha_venc)||new Date(9999,0))-(parseFechaToDate(b.fecha_venc)||new Date(9999,0)))[0];
+    const dias=diasHasta(proxVenc.fecha_venc);
+    const dc=dias<0?'var(--accent)':dias<=30?'var(--accent4)':'var(--accent3)';
+    return `<div class="mini-card c${i%6}" onclick="ptSelectCliente('${c}')">
+      <div class="mc-header"><div class="mc-name">${c}</div><span class="broker-badge broker-${(ps[0].alyc||'').toLowerCase()}">${ps[0].alyc}</span></div>
+      <div class="mc-capital">${fM(totalVN)}</div>
+      <div class="mc-info">${ps.length} préstamo(s) · próx. venc. <span style="color:${dc};font-weight:600">${dias>=0?dias+'d':'Vencido'}</span></div>
+    </div>`;
+  }).join('');
+}
+
+function ptShowAll(btn) {
+  ptCurrentCliente=null;
+  document.querySelectorAll('#ptClientRail .client-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('ptAllView').style.display='';
+  document.getElementById('ptClientView').style.display='none';
+}
+
+function ptSelectCliente(nombre,btn) {
+  ptCurrentCliente=nombre;
+  document.querySelectorAll('#ptClientRail .client-btn').forEach(b=>b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  else [...document.querySelectorAll('#ptClientRail .client-btn')].forEach(b=>{ if(b.textContent.trim()===nombre) b.classList.add('active'); });
+  document.getElementById('ptAllView').style.display='none';
+  document.getElementById('ptClientView').style.display='';
+  ptRenderClientDetail(nombre);
+}
+
+function ptRenderClientDetail(nombre) {
+  const ps=PRESTAMOS.filter(p=>p.cliente===nombre);
+  const totalVN=ps.reduce((s,p)=>s+p.garantias.reduce((gs,g)=>gs+(g.vn_inicio||0),0),0);
+  const proxVenc=[...ps].sort((a,b)=>(parseFechaToDate(a.fecha_venc)||new Date(9999,0))-(parseFechaToDate(b.fecha_venc)||new Date(9999,0)))[0];
+  const dias=diasHasta(proxVenc.fecha_venc);
+  const cupoVal=PT_CUPO[nombre];
+  document.getElementById('ptClientKpis').innerHTML=`
+    <div class="kpi-box"><div class="lbl">Préstamos activos</div><div class="val">${ps.length}</div></div>
+    <div class="kpi-box"><div class="lbl">VN Total garantía</div><div class="val">${fM(totalVN)}</div></div>
+    <div class="kpi-box" style="border:2px solid var(--accent5);background:rgba(90,122,170,0.06)">
+      <div class="lbl" style="color:var(--accent5)">Cupo disponible</div>
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:1.7rem;color:var(--accent5);margin-top:4px">${cupoVal?'$'+fN(cupoVal):'—'}</div>
+    </div>
+    <div class="kpi-box"><div class="lbl">Próx. vencimiento</div><div class="val" style="font-size:1.2rem;font-family:'IBM Plex Mono'">${proxVenc.fecha_venc}</div><div class="delta" style="color:${dias<=30?'var(--accent4)':'var(--accent3)'}">${dias>=0?dias+' días':'Vencido'}</div></div>
+    <div class="kpi-box"><div class="lbl">ALyC</div><div class="val" style="font-size:1rem"><span class="broker-badge broker-${(ps[0].alyc||'').toLowerCase()}">${ps[0].alyc}</span></div></div>`;
+
+  // Garantías: mostrar por préstamo separado, sin deduplicar entre prestamistas
+  const garantiasPorPrestamo = ps.map(p=>({
+    prestamista: p.prestamista,
+    garantias: p.garantias
+  }));
+  const todasGarantias = garantiasPorPrestamo.flatMap(pp=>
+    pp.garantias.map(g=>({...g, _prestamista: pp.prestamista}))
+  );
+  // Deduplicar solo dentro del mismo prestamista
+  const seen = new Set();
+  const garantiasUnicas = todasGarantias.filter(g=>{
+    const key = g._prestamista+'|'+g.ticket;
+    if(seen.has(key)) return false;
+    seen.add(key); return true;
+  });
+  document.getElementById('ptGarantiaTable').innerHTML=garantiasUnicas.map(g=>`
+    <tr>
+      <td style="font-family:'Bebas Neue',sans-serif;font-size:0.9rem">${g.ticket}</td>
+      <td style="text-align:right">${fN(g.cantidad)}</td>
+      <td style="text-align:right;font-weight:600">$${fN(g.vn_inicio)}</td>
+    </tr>`).join('');
+
+  document.getElementById('ptContratoDetail').innerHTML=ps.map(p=>`
+    <div style="border:1px solid var(--border);padding:16px;border-radius:4px;margin-bottom:12px">
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:1rem;margin-bottom:10px;color:var(--ink2)">${p.prestamista}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 20px;font-size:0.7rem">
+        <span style="color:var(--ink3)">Firma:</span><span>${p.fecha_firma}</span>
+        <span style="color:var(--ink3)">Vencimiento:</span><span style="font-weight:600">${p.fecha_venc}</span>
+        <span style="color:var(--ink3)">Plazo:</span><span>${p.plazo} días</span>
+        <span style="color:var(--ink3)">Estado:</span><span>${p.estado}</span>
+      </div>
+    </div>`).join('');
+}
+
+// ── FACTURACIÓN ──
+let facturaFilter='todas', chartFactMesInst=null, chartFactClienteInst=null;
+function initFactura(){ renderFactKPIs(); renderFactCharts(); renderFactTable(); }
+
+function renderFactKPIs() {
+  const total=FACTURAS.reduce((s,f)=>s+(f.total||0),0);
+  const pagadas=FACTURAS.filter(f=>f.estado==='Pagada');
+  const pend=FACTURAS.filter(f=>f.estado!=='Pagada');
+  document.getElementById('fKpiRow').innerHTML=`
+    <div class="kpi-box"><div class="lbl">Total facturado</div><div class="val">${fM(total)}</div><div class="delta">${FACTURAS.length} facturas</div></div>
+    <div class="kpi-box"><div class="lbl">Cobrado</div><div class="val" style="color:var(--fnv-teal)">${fM(pagadas.reduce((s,f)=>s+(f.total||0),0))}</div><div class="delta up">${pagadas.length} pagadas</div></div>
+    <div class="kpi-box"><div class="lbl">Pendiente</div><div class="val" style="color:var(--accent)">${fM(pend.reduce((s,f)=>s+(f.total||0),0))}</div><div class="delta down">${pend.length} pendientes</div></div>
+    <div class="kpi-box"><div class="lbl">IVA total</div><div class="val">${fM(FACTURAS.reduce((s,f)=>s+(f.iva||0),0))}</div></div>
+    <div class="kpi-box"><div class="lbl">Clientes</div><div class="val">${new Set(FACTURAS.map(f=>f.cliente)).size}</div></div>`;
+}
+
+function renderFactCharts() {
+  const c=getChartColors();
+  const byMes={};
+  FACTURAS.forEach(f=>{ const k=(f.mes||'').slice(0,7); if(!k) return; byMes[k]=(byMes[k]||0)+(f.total||0); });
+  const mesLabels=Object.keys(byMes).sort();
+  if(chartFactMesInst) chartFactMesInst.destroy();
+  chartFactMesInst=new Chart(document.getElementById('chartFactMes'),{
+    type:'bar',
+    data:{labels:mesLabels,datasets:[{data:mesLabels.map(k=>byMes[k]),backgroundColor:mesLabels.map((_,i)=>i===mesLabels.length-1?'rgba(200,64,42,0.8)':'rgba(200,64,42,0.25)'),borderRadius:3,borderSkipped:false}]},
+    options:{responsive:true,maintainAspectRatio:true,plugins:{legend:{display:false},tooltip:{backgroundColor:c.tooltip_bg,borderColor:'#333',borderWidth:1,titleColor:'#888',bodyColor:c.tooltip_body,callbacks:{label:ctx=>` ${fM(ctx.raw)}`}}},scales:{x:{grid:{color:c.grid},ticks:{color:c.tick,font:{family:'IBM Plex Mono',size:9}}},y:{grid:{color:c.grid},ticks:{color:c.tick,font:{family:'IBM Plex Mono',size:9},callback:v=>fM(v)},border:{dash:[4,4]}}}}
+  });
+  const byC={};
+  FACTURAS.forEach(f=>{ byC[f.cliente]=(byC[f.cliente]||0)+(f.total||0); });
+  const cL=Object.keys(byC);
+  if(chartFactClienteInst) chartFactClienteInst.destroy();
+  chartFactClienteInst=new Chart(document.getElementById('chartFactCliente'),{
+    type:'doughnut',
+    data:{labels:cL,datasets:[{data:cL.map(k=>byC[k]),backgroundColor:COLORS.slice(0,cL.length),borderColor:getComputedStyle(document.body).getPropertyValue('--card').trim()||'#fff',borderWidth:3,hoverOffset:6}]},
+    options:{responsive:true,maintainAspectRatio:true,cutout:'68%',plugins:{legend:{position:'bottom',labels:{color:c.tick,font:{family:'IBM Plex Mono',size:9},padding:12,usePointStyle:true}},tooltip:{backgroundColor:c.tooltip_bg,borderColor:'#333',borderWidth:1,titleColor:'#888',bodyColor:c.tooltip_body,callbacks:{label:ctx=>` ${fM(ctx.raw)}`}}}}
+  });
+}
+
+function renderFactTable() {
+  const visible=facturaFilter==='todas'?FACTURAS:FACTURAS.filter(f=>f.estado===facturaFilter);
+  document.getElementById('fTableSub').textContent=`${visible.length} de ${FACTURAS.length} registros`;
+  const eStyle=e=>{
+    if(e==='Pagada')    return 'background:rgba(42,184,122,0.15);color:#1a8055;border:1px solid rgba(42,184,122,0.3)';
+    if(e==='Facturada') return 'background:rgba(212,134,10,0.15);color:#8a5500;border:1px solid rgba(212,134,10,0.3)';
+    return 'background:rgba(200,64,42,0.15);color:#9a1a0a;border:1px solid rgba(200,64,42,0.3)';
+  };
+  document.getElementById('fTableBody').innerHTML=[...visible].reverse().map(f=>`
+    <tr>
+      <td style="font-family:'Bebas Neue',sans-serif;font-size:0.85rem">${f.cliente}</td>
+      <td>${(f.mes||'').slice(0,7)||'—'}</td>
+      <td>${f.fecha_fac||'—'}</td>
+      <td>${f.fecha_pago||'—'}</td>
+      <td>$${fN(f.monto||0)}</td>
+      <td style="color:var(--ink3)">${f.iva>0?'$'+fN(f.iva):'—'}</td>
+      <td style="font-weight:600">$${fN(f.total||0)}</td>
+      <td><span style="${eStyle(f.estado)};font-size:0.55rem;padding:3px 8px;display:inline-block">${f.estado}</span></td>
+    </tr>`).join('');
+}
+
+function filterFacturas(f,btn) {
+  facturaFilter=f;
+  document.querySelectorAll('#sectionFacturacion .toggle-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderFactTable();
+}
+
+// ── TASAS ──
+let tasasInited=false, chartT1d=null, chartT7d=null;
+
+function renderTasasSection() {
+  const last1d=TASAS_1D.length?TASAS_1D[TASAS_1D.length-1]:null;
+  const last7d=TASAS_7D.length?TASAS_7D[TASAS_7D.length-1]:null;
+  document.getElementById('tasasKpi').innerHTML=`
+    <div class="kpi-box">
+      <div class="lbl">Última tasa 1D</div>
+      <div class="val">${last1d ? formatearPorcentaje(last1d.valor) : '—'}</div>
+      <div class="delta">${last1d?last1d.fecha:'sin datos'}</div>
+    </div>
+    <div class="kpi-box">
+      <div class="lbl">Última tasa 7D</div>
+      <div class="val">${last7d ? formatearPorcentaje(last7d.valor) : '—'}</div>
+      <div class="delta">${last7d?last7d.fecha:'sin datos'}</div>
+    </div>`;
+  renderTasasCharts();
+}
+
+function renderTasasCharts() {
+  const c=getChartColors();
+
+  // Convertir valores para el eje Y: si son decimales (0.21) → multiplicar x100 para mostrar como %
+  // Detectar automáticamente el rango
+  const toDisplayPct = arr => arr.map(r => r.valor <= 1 && r.valor > 0 ? r.valor * 100 : r.valor);
+
+  const lineOpts = color => ({
+    responsive:true, maintainAspectRatio:true,
+    plugins:{
+      legend:{display:false},
+      tooltip:{
+        backgroundColor:c.tooltip_bg, borderColor:'#333', borderWidth:1,
+        titleColor:'#888', bodyColor:c.tooltip_body,
+        callbacks:{label:ctx=>`  ${ctx.raw.toFixed(2).replace('.',',')}%`}
+      }
+    },
+    scales:{
+      x:{grid:{color:c.grid},ticks:{color:c.tick,font:{family:'IBM Plex Mono',size:9},maxTicksLimit:10}},
+      y:{grid:{color:c.grid},ticks:{color:c.tick,font:{family:'IBM Plex Mono',size:9},callback:v=>v.toFixed(1)+'%'},border:{dash:[4,4]}}
+    }
+  });
+
+  if(chartT1d) chartT1d.destroy();
+  chartT1d=new Chart(document.getElementById('chartTasas1d'),{
+    type:'line',
+    data:{
+      labels: TASAS_1D.map(r=>r.fecha),
+      datasets:[{
+        label:'TNA 1D %',
+        data: toDisplayPct(TASAS_1D),
+        borderColor:'#3aacac', backgroundColor:'rgba(58,172,172,0.1)',
+        borderWidth:2, pointRadius:TASAS_1D.length>60?1:3,
+        pointBackgroundColor:'#3aacac', fill:true, tension:0.3
+      }]
+    },
+    options: lineOpts('#3aacac')
+  });
+
+  if(chartT7d) chartT7d.destroy();
+  chartT7d=new Chart(document.getElementById('chartTasas7d'),{
+    type:'line',
+    data:{
+      labels: TASAS_7D.map(r=>r.fecha),
+      datasets:[{
+        label:'TNA 7D %',
+        data: toDisplayPct(TASAS_7D),
+        borderColor:'#d4860a', backgroundColor:'rgba(212,134,10,0.1)',
+        borderWidth:2, pointRadius:TASAS_7D.length>60?1:3,
+        pointBackgroundColor:'#d4860a', fill:true, tension:0.3
+      }]
+    },
+    options: lineOpts('#d4860a')
+  });
+}
+
+// ── EXPORT ──
+function exportarDatos() {
+  const datos={version:1,fecha:new Date().toISOString(),caucion:RAW,prestamos:PRESTAMOS,facturas:FACTURAS,cupos:PT_CUPO,brokers:CLIENT_BROKER,tasas_1d:TASAS_1D,tasas_7d:TASAS_7D};
+  const blob=new Blob([JSON.stringify(datos,null,2)],{type:'application/json;charset=utf-8'});
+  const url=URL.createObjectURL(blob); const a=document.createElement('a');
+  a.href=url; a.download='fnv_datos_'+new Date().toISOString().slice(0,10)+'.json'; a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ── REPORTES ──
+function downloadWordCaucion(clientName, format) {
+  format = format||'pdf';
+  const d = RAW[clientName]; if(!d||!d.length) return;
+  const broker = CLIENT_BROKER[clientName]||'Dracma';
+  const last = d[d.length-1], first = d[0];
+  const totalInt    = d.reduce((s,r)=>s+r.interes,0);
+  const totalGastos = d.reduce((s,r)=>s+r.total_gastos,0);
+  const avgTna      = d.reduce((s,r)=>s+r.tna,0)/d.length;
+  const avgCft      = d.reduce((s,r)=>s+(r.cft||0),0)/d.length;
+  const rend        = first.caucion>0?((last.neto/first.caucion-1)*100).toFixed(2):0;
+  const imgMain = document.getElementById('chartMain') ? document.getElementById('chartMain').toDataURL('image/png') : '';
+  const imgTna  = document.getElementById('chartTna')  ? document.getElementById('chartTna').toDataURL('image/png')  : '';
+  const rows = [...d].reverse().map(r=>`
+    <tr>
+      <td>${r.fecha}</td>
+      <td style="text-align:right">$${fN(r.caucion/1e6,2)}M</td>
+      <td style="text-align:center">${formatearPorcentaje(r.tna)}</td>
+      <td style="text-align:center">${r.plazo}d</td>
+      <td style="text-align:right">$${fN(r.interes)}</td>
+      <td style="text-align:right">$${fN(r.total_gastos)}</td>
+      <td style="text-align:right;font-weight:bold">$${fN(r.neto/1e6,2)}M</td>
+    </tr>`).join('');
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8">
+<style>
+  @page{margin:1.5cm;}
+  *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;box-sizing:border-box;}
+  body{font-family:Arial,sans-serif;color:#1a2832;font-size:10px;margin:0;}
+  .hdr{background:#0d7a7a;padding:14px 20px;margin-bottom:0;}
+  .hdr-sub{font-size:8px;color:#b0e8e8;letter-spacing:1px;text-transform:uppercase;margin-top:3px;}
+  .hdr-title{font-size:20px;font-weight:bold;color:#fff;}
+  .meta{display:flex;gap:20px;padding:10px 20px;border-bottom:1px solid #d8e8e8;font-size:9px;background:#f8fcfc;margin-bottom:14px;}
+  .meta strong{color:#1a2832;}
+  .kpi-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:0 0 14px;}
+  .kpi{border:1px solid #d8e8e8;padding:12px 14px;background:#fafefe;}
+  .kpi-l{font-size:7px;text-transform:uppercase;letter-spacing:1px;color:#8aa0a8;margin-bottom:4px;}
+  .kpi-v{font-size:18px;font-weight:bold;color:#1a2832;}
+  .kpi-s{font-size:7px;color:#8aa0a8;margin-top:2px;}
+  .charts{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;}
+  .chart-box{border:1px solid #d8e8e8;padding:10px;background:#fafefe;}
+  .chart-lbl{font-size:7px;text-transform:uppercase;letter-spacing:0.5px;color:#8aa0a8;margin-bottom:6px;}
+  .chart-box img{width:100%;height:160px;object-fit:contain;display:block;}
+  .sec-title{font-size:11px;font-weight:bold;color:#0d7a7a;text-transform:uppercase;letter-spacing:0.5px;margin:14px 0 8px;border-bottom:1px solid #d8e8e8;padding-bottom:5px;}
+  table{width:100%;border-collapse:collapse;font-size:8.5px;}
+  thead th{background:#1a2832;color:#fff;padding:6px 8px;text-align:left;font-size:8px;text-transform:uppercase;letter-spacing:0.5px;}
+  thead th:not(:first-child){text-align:right;}
+  tbody td{padding:5px 8px;border-bottom:1px solid #f0f4f4;text-align:right;}
+  tbody td:first-child{text-align:left;}
+  tbody tr:nth-child(even) td{background:#f8fbfb;}
+  .footer{margin-top:14px;padding-top:8px;border-top:2px solid #0d7a7a;font-size:7.5px;color:#8aa0a8;display:flex;justify-content:space-between;}
+  .disclaimer{margin-top:10px;padding:8px 12px;border:1px solid #d8e8e8;background:#f8fefe;font-size:7px;color:#7a9898;line-height:1.6;}
+</style>
+</head><body>
+<div class="hdr">
+  <div class="hdr-title">REPORTE DE CAUCIÓN TOMADORA</div>
+  <div class="hdr-sub">FNV Capital · Agente Productor de Agente de Negociación · Matrícula 750 - CNV</div>
+</div>
+<div class="meta">
+  <div>Cliente: <strong>${clientName}</strong></div>
+  <div>ALyC: <strong>${broker}</strong></div>
+  <div>Período: <strong>${first.fecha} → ${last.fecha}</strong></div>
+  <div>Operaciones: <strong>${d.length}</strong></div>
+  <div>Generado: <strong>${new Date().toLocaleDateString('es-AR')}</strong></div>
+</div>
+<div style="padding:0 0 14px">
+  <div class="sec-title">Resumen Ejecutivo</div>
+  <div class="kpi-grid">
+    <div class="kpi"><div class="kpi-l">Capital actual (neto)</div><div class="kpi-v">${fM(last.neto)}</div><div class="kpi-s">al ${last.fecha}</div></div>
+    <div class="kpi"><div class="kpi-l">Capital inicial</div><div class="kpi-v">${fM(first.caucion)}</div><div class="kpi-s">desde ${first.fecha}</div></div>
+    <div class="kpi"><div class="kpi-l">Interés acumulado</div><div class="kpi-v">$${fN(totalInt)}</div><div class="kpi-s">+${rend}% total</div></div>
+    <div class="kpi"><div class="kpi-l">TNA promedio</div><div class="kpi-v">${formatearPorcentaje(avgTna)}</div><div class="kpi-s">${d.length} operaciones</div></div>
+    <div class="kpi"><div class="kpi-l">Gastos totales</div><div class="kpi-v">$${fN(totalGastos)}</div><div class="kpi-s">${totalInt>0?((totalGastos/totalInt)*100).toFixed(1):0}% del interés</div></div>
+    <div class="kpi"><div class="kpi-l">CFT promedio</div><div class="kpi-v">${formatearPorcentaje(avgCft)}</div><div class="kpi-s">Costo Financiero Total</div></div>
+  </div>
+  ${imgMain||imgTna?`
+  <div class="sec-title">Gráficos de Evolución</div>
+  <div class="charts">
+    ${imgMain?`<div class="chart-box"><div class="chart-lbl">Evolución del capital</div><img src="${imgMain}"></div>`:''}
+    ${imgTna?`<div class="chart-box"><div class="chart-lbl">Distribución de tasas (TNA)</div><img src="${imgTna}"></div>`:''}
+  </div>`:''}
+  <div class="sec-title">Detalle de Operaciones</div>
+  <table>
+    <thead><tr><th>Fecha</th><th>Capital</th><th>TNA</th><th>Plazo</th><th>Interés</th><th>Gastos</th><th>Neto</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table>
+  <div class="footer">
+    <span>FNV Capital · Agente Productor de Agente de Negociación · Matrícula 750 - CNV</span>
+    <span>Generado el ${new Date().toLocaleDateString('es-AR')}</span>
+  </div>
+  <div class="disclaimer">Toda la información surge de los reportes oficiales del sistema comitente. Este informe es de carácter informativo y no constituye asesoramiento de inversión.</div>
+</div>
+</body></html>`;
+  if(format==='pdf') {
+    const w=window.open('','_blank'); w.document.write(html); w.document.close(); w.focus(); setTimeout(()=>w.print(),700);
+  } else {
+    const blob=new Blob(['\ufeff'+html],{type:'application/msword;charset=utf-8'});
+    const url=URL.createObjectURL(blob); const a=document.createElement('a');
+    a.href=url; a.download=`Caucion_${clientName.replace(/\s+/g,'_')}_${new Date().toISOString().slice(0,10)}.doc`; a.click();
+    URL.revokeObjectURL(url);
+  }
+}
+
+function downloadWordPrestamo(clientName,format) {
+  format=format||'pdf'; const ps=PRESTAMOS.filter(p=>p.cliente===clientName); if(!ps.length) return;
+  const proxVenc=[...ps].sort((a,b)=>(parseFechaToDate(a.fecha_venc)||new Date(9999,0))-(parseFechaToDate(b.fecha_venc)||new Date(9999,0)))[0];
+  const dias=diasHasta(proxVenc.fecha_venc);
+  const totalVN=ps.reduce((s,p)=>s+p.garantias.reduce((gs,g)=>gs+(g.vn_inicio||0),0),0);
+  const ticketsSeen=new Set();
+  const gRows=ps.flatMap(p=>p.garantias).filter(g=>{ if(ticketsSeen.has(g.ticket)) return false; ticketsSeen.add(g.ticket); return true; })
+    .map(g=>`<tr><td>${g.ticket}</td><td style="text-align:right">${fN(g.cantidad)}</td><td style="text-align:right">$${fN(g.vn_inicio)}</td></tr>`).join('');
+  const cRows=ps.map(p=>`<tr><td>${p.prestamista}</td><td>${p.alyc}</td><td>${p.fecha_firma}</td><td>${p.plazo}d</td><td style="font-weight:bold">${p.fecha_venc}</td><td>${p.estado}</td></tr>`).join('');
+  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"><style>@page{margin:2cm}body{font-family:Arial,sans-serif;color:#1a1a2e;font-size:11px}.hdr{background:#1e3a6e;padding:14px 20px;margin-bottom:20px}.t{font-size:20px;font-weight:bold;color:#fff}.s{font-size:9px;color:#a0c4f0;letter-spacing:1px}table{width:100%;border-collapse:collapse;font-size:10px}th{background:#1a1a2e;color:#fff;padding:8px 10px;text-align:left;font-size:9px;text-transform:uppercase}td{padding:7px 10px;border-bottom:1px solid #eee}tr:nth-child(even)td{background:#f8f9fa}</style></head><body>
+  <div class="hdr"><div class="t">REPORTE DE PRÉSTAMO DE TÍTULOS</div><div class="s">FNV Capital · Matrícula 750 - CNV</div></div>
+  <div style="display:flex;justify-content:space-between;margin-bottom:16px;font-size:11px"><div><strong>Prestatario:</strong> ${clientName}</div><div><strong>ALyC:</strong> ${ps[0].alyc}</div><div><strong>Generado:</strong> ${new Date().toLocaleDateString('es-AR')}</div></div>
+  ${dias<=30&&dias>=0?`<div style="background:#fff8e8;border-left:4px solid #d4860a;padding:12px 16px;margin-bottom:16px;font-size:11px">⚠ Próximo vencimiento en <strong>${dias} días</strong></div>`:''}
+  <h3 style="margin:16px 0 8px;font-size:13px;color:#1e3a6e">VN Total: ${fM(totalVN)}</h3>
+  <table><thead><tr><th>Ticket</th><th>Cantidad</th><th>VN Inicio</th></tr></thead><tbody>${gRows}</tbody></table>
+  <h3 style="margin:16px 0 8px;font-size:13px;color:#1e3a6e">Contratos</h3>
+  <table><thead><tr><th>Prestamista</th><th>ALyC</th><th>Firma</th><th>Plazo</th><th>Vencimiento</th><th>Estado</th></tr></thead><tbody>${cRows}</tbody></table>
+  </body></html>`;
+  if(format==='pdf'){const w=window.open('','_blank');w.document.write(html);w.document.close();w.focus();setTimeout(()=>w.print(),600);}
+  else{const blob=new Blob(['\ufeff'+html],{type:'application/msword;charset=utf-8'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`Prestamo_${clientName.replace(/\s+/g,'_')}_${new Date().toISOString().slice(0,10)}.doc`;a.click();URL.revokeObjectURL(url);}
+}
+
+// ── SECTION SWITCHING ──
+let facturaInited=false, prestamoInited=false;
+function switchSection(sec,btn) {
+  ['sectionCauciones','sectionPrestamos','sectionFacturacion','sectionTasas'].forEach(id=>{
+    document.getElementById(id).style.display='none';
+  });
+  const map={caucion:'sectionCauciones',prestamo:'sectionPrestamos',facturacion:'sectionFacturacion',tasas:'sectionTasas'};
+  document.getElementById(map[sec]).style.display='';
+  document.querySelectorAll('.snav-btn').forEach(b=>b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  if(sec==='facturacion'){ initFactura(); }
+  if(sec==='prestamo'){    ptRenderAll(); }
+  if(sec==='tasas'){ tasasInited=true; renderTasasSection(); }
+}
+
+// ── INIT ──
+document.addEventListener('DOMContentLoaded', ()=>{
+  document.getElementById('sectionCauciones').style.display='';
+  ['sectionPrestamos','sectionFacturacion','sectionTasas'].forEach(id=>{
+    document.getElementById(id).style.display='none';
+  });
+  if(localStorage.getItem('fnv-theme')==='dark'){
+    document.body.classList.add('dark');
+    document.getElementById('darkBtn').textContent='☀ Claro';
+  }
+  cargarDatos();
+});
+</script>
+</body>
+</html>
